@@ -114,7 +114,7 @@ const SUPABASE_URL = 'https://dekgcnvnzzenmhxthtep.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRla2djbnZuenplbm1oeHRodGVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyNDEwMjAsImV4cCI6MjEwOTgxNzAyMH0.90YprWVOva676ODXbL9abTw_ZgANIWnrfbTx9mESGYw';
 const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let S = { settings:{shop:'Oto Yıkama',baseUrl:'', instagram:''}, services:[], jobs:[] };
+let S = { settings:{shop:'Oto Yıkama', baseUrl:'', instagram:'', ibanName:'', ibanNo:''}, services:[], jobs:[] };
 
 const $ = (s,e=document)=>e.querySelector(s);
 const TL = n=>Number(n||0).toLocaleString('tr-TR')+' ₺';
@@ -140,7 +140,15 @@ async function loadDB() {
     supa.from('services').select('*').order('created_at'),
     supa.from('jobs').select('*')
   ]);
-  if(resSet.data) S.settings = {shop: resSet.data.shop, baseUrl: resSet.data.base_url, instagram: resSet.data.instagram || ''};
+  if(resSet.data) {
+    S.settings = {
+      shop: resSet.data.shop, 
+      baseUrl: resSet.data.base_url, 
+      instagram: resSet.data.instagram || '',
+      ibanName: resSet.data.iban_name || '',
+      ibanNo: resSet.data.iban_no || ''
+    };
+  }
   if(resSvc.data) S.services = resSvc.data;
   if(resJobs.data) S.jobs = resJobs.data.map(mapJobFromDB);
 }
@@ -232,7 +240,13 @@ async function setStatus(id,s){
   const j=S.jobs.find(x=>x.id===id); if(j.status===s) return;
   j.status=s; rJobs();
   await supa.from('jobs').update({status: s}).eq('id', id);
-  if(s==='bitti') sendWA(j,'Aracınız ('+j.plate+') bitmiştir, gelip teslim alabilirsiniz. '+S.settings.shop);
+  if(s==='bitti') {
+    let paymentInfo = '';
+    if(S.settings.ibanNo) {
+      paymentInfo = `\n\nÖdeme Yöntemimiz:\n${S.settings.ibanNo} (${S.settings.ibanName})`;
+    }
+    sendWA(j, 'Aracınız ('+j.plate+') bitmiştir, gelip teslim alabilirsiniz. '+S.settings.shop + paymentInfo);
+  }
   toast(ST[s]);
 }
 
@@ -262,7 +276,11 @@ async function credit(id){
 
 function remind(id){
   const j=S.jobs.find(x=>x.id===id);
-  sendWA(j,'Merhaba'+(j.name?' '+j.name:'')+', '+S.settings.shop+' için '+TL(total(j))+' tutarında ödemeniz bulunmaktadır. İyi günler dileriz.');
+  let paymentInfo = '';
+  if(S.settings.ibanNo) {
+    paymentInfo = `\n\nÖdeme Yöntemimiz:\n${S.settings.ibanNo} (${S.settings.ibanName})`;
+  }
+  sendWA(j,'Merhaba'+(j.name?' '+j.name:'')+', '+S.settings.shop+' için '+TL(total(j))+' tutarında ödemeniz bulunmaktadır. İyi günler dileriz.' + paymentInfo);
 }
 
 function rCredit(){
@@ -404,19 +422,28 @@ function rCash(){
 function rSet(){
   $('#t-ayar').innerHTML = `<div class="card"><h2>Ayarlar</h2>
     <label>Dükkan adı</label><input id="aShop" value="${esc(S.settings.shop)}">
-    <label>Takip linki adresi (GitHub site adresiniz)</label>
-    <input id="aBase" value="${esc(S.settings.baseUrl)}" placeholder="https://kullaniciadin.github.io/otoyikama/">
-    <label>Instagram Profil Linki</label>
-    <input id="aIg" value="${esc(S.settings.instagram)}" placeholder="https://instagram.com/otoyikama">
+    <label>Takip linki adresi (GitHub site adresiniz)</label><input id="aBase" value="${esc(S.settings.baseUrl)}" placeholder="https://kullaniciadin.github.io/otoyikama/">
+    <label>Instagram Profil Linki</label><input id="aIg" value="${esc(S.settings.instagram)}" placeholder="https://instagram.com/otoyikama">
+    <label>Hesap Sahibi (Ad Soyad)</label><input id="aIbanName" value="${esc(S.settings.ibanName)}" placeholder="Recep Arıcan">
+    <label>IBAN Numarası</label><input id="aIbanNo" value="${esc(S.settings.ibanNo)}" placeholder="TR63 ...">
     <button class="btn full" id="aSave">Kaydet</button></div>`;
     
   $('#aSave').onclick = async () => {
     S.settings.shop = $('#aShop').value.trim()||'Oto Yıkama';
     S.settings.baseUrl = $('#aBase').value.trim();
     S.settings.instagram = $('#aIg').value.trim();
+    S.settings.ibanName = $('#aIbanName').value.trim();
+    S.settings.ibanNo = $('#aIbanNo').value.trim();
     
     const { data: { user } } = await supa.auth.getUser();
-    await supa.from('settings').upsert({owner: user.id, shop: S.settings.shop, base_url: S.settings.baseUrl, instagram: S.settings.instagram});
+    await supa.from('settings').upsert({
+      owner: user.id, 
+      shop: S.settings.shop, 
+      base_url: S.settings.baseUrl, 
+      instagram: S.settings.instagram,
+      iban_name: S.settings.ibanName,
+      iban_no: S.settings.ibanNo
+    });
     
     title(); toast('Kaydedildi');
   };
@@ -435,7 +462,6 @@ async function rCust(id){
   const msg={bekliyor:'Aracınız sırada, yakında başlayacağız.',yikaniyor:'Aracınız şu an yıkanıyor.',bitti:'Aracınız hazır, gelip teslim alabilirsiniz.'}[j.status];
   const o=k=>j.status===k?1:.3;
   
-  // Settings'ten instagram linkini de çekebilmek için ek sorgu
   const { data: setData } = await supa.from('settings').select('instagram').maybeSingle();
   const igLink = setData?.instagram || '';
 
