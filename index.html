@@ -48,6 +48,9 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outl
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
 .stat{background:linear-gradient(135deg,#14284a,#2563eb);color:#fff;border-radius:18px;padding:16px;box-shadow:0 6px 18px rgba(37,99,235,.25)}
 .stat b{display:block;font-size:1.4rem}.stat span{color:#bfdbfe;font-size:.85rem}
+.stat.green{background:linear-gradient(135deg,#065f46,#10b981)}
+.stat.red-gr{background:linear-gradient(135deg,#991b1b,#ef4444)}
+.stat.amber{background:linear-gradient(135deg,#92400e,#f59e0b)}
 .svc{display:flex;gap:8px;align-items:center;margin-bottom:8px}.svc input:first-child{flex:2}.svc input{flex:1}
 .empty{color:var(--mut);text-align:center;padding:28px}
 .tot{display:flex;justify-content:space-between;border-top:1px solid var(--line);margin-top:8px;padding-top:10px;font-weight:700}
@@ -94,7 +97,9 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outl
   <button data-t="yeni">Yeni kayıt</button>
   <button data-t="veresiye">Veresiye</button>
   <button data-t="hizmet">Hizmetler</button>
-  <button data-t="kasa">Kazanç defteri</button>
+  <button data-t="kasa">Kazanç</button>
+  <button data-t="gider">Giderler</button>
+  <button data-t="karzarar">Kar / Zarar</button>
   <button data-t="ayar">Ayarlar</button>
 </nav>
 <main>
@@ -103,6 +108,8 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outl
   <section id="t-veresiye" class="hide"></section>
   <section id="t-hizmet" class="hide"></section>
   <section id="t-kasa" class="hide"></section>
+  <section id="t-gider" class="hide"></section>
+  <section id="t-karzarar" class="hide"></section>
   <section id="t-ayar" class="hide"></section>
 </main>
 </div>
@@ -114,16 +121,16 @@ const SUPABASE_URL = 'https://dekgcnvnzzenmhxthtep.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRla2djbnZuenplbm1oeHRodGVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyNDEwMjAsImV4cCI6MjEwOTgxNzAyMH0.90YprWVOva676ODXbL9abTw_ZgANIWnrfbTx9mESGYw';
 const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let S = { settings:{shop:'Oto Yıkama', baseUrl:'', instagram:'', ibanName:'', ibanNo:''}, services:[], jobs:[] };
+let S = { settings:{shop:'Oto Yıkama', baseUrl:'', instagram:'', ibanName:'', ibanNo:''}, services:[], jobs:[], expenses:[] };
 
 const $ = (s,e=document)=>e.querySelector(s);
 const TL = n=>Number(n||0).toLocaleString('tr-TR')+' ₺';
 const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ST = {bekliyor:'Beklemede',yikaniyor:'Yıkanıyor',bitti:'Bitti'};
 const total = j=>j.items.reduce((a,b)=>a+Number(b.price),0);
+fn_toast = m => toast(m);
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200)}
 
-/* Veritabanından JS formatına dönüştürücüler */
 const mapJobFromDB = j => ({
   id: j.id, plate: j.plate, name: j.customer_name, phone: j.phone,
   status: j.status, items: j.items, payment: j.payment,
@@ -133,12 +140,12 @@ const mapJobFromDB = j => ({
   created: new Date(j.created_at).getTime()
 });
 
-/* Supabase'den ilk verileri çekme */
 async function loadDB() {
-  const [resSet, resSvc, resJobs] = await Promise.all([
+  const [resSet, resSvc, resJobs, resExp] = await Promise.all([
     supa.from('settings').select('*').maybeSingle(),
     supa.from('services').select('*').order('created_at'),
-    supa.from('jobs').select('*')
+    supa.from('jobs').select('*'),
+    supa.from('expenses').select('*').order('expense_date', {ascending: false})
   ]);
   if(resSet.data) {
     S.settings = {
@@ -151,6 +158,7 @@ async function loadDB() {
   }
   if(resSvc.data) S.services = resSvc.data;
   if(resJobs.data) S.jobs = resJobs.data.map(mapJobFromDB);
+  if(resExp.data) S.expenses = resExp.data;
 }
 
 function trackLink(id){
@@ -168,7 +176,7 @@ function sendWA(job, text){
   window.open('https://wa.me/'+waNumber(job.phone)+'?text='+encodeURIComponent(text),'_blank');
 }
 
-/* ============ GİRİŞ EKRANI YÖNETİMİ ============ */
+/* ============ GİRİŞ EKRANI ============ */
 $('#pinBtn').onclick = async () => {
   const pin = $('#pinInput').value;
   $('#pinErr').classList.add('hide');
@@ -183,7 +191,7 @@ $('#pinBtn').onclick = async () => {
     });
     
     if(error) {
-      $('#pinErr').textContent = "Bağlantı hatası! Supabase'de kullanıcıyı oluşturdunuz mu?";
+      $('#pinErr').textContent = "Bağlantı hatası! Kullanıcı kontrol edin.";
       $('#pinErr').classList.remove('hide');
       pinBtn.textContent = "Giriş Yap";
       pinBtn.disabled = false;
@@ -208,20 +216,18 @@ $('#nav').addEventListener('click',e=>{
 function showTab(t){
   document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
   document.querySelectorAll('main section').forEach(x=>x.classList.toggle('hide',x.id!=='t-'+t));
-  ({araclar:rJobs,yeni:rNew,veresiye:rCredit,hizmet:rSvc,kasa:rCash,ayar:rSet})[t]();
+  ({araclar:rJobs,yeni:rNew,veresiye:rCredit,hizmet:rSvc,kasa:rCash,gider:rExp,karzarar:rProfit,ayar:rSet})[t]();
 }
 
 /* ============ ARAÇLAR ============ */
 const plateHTML=p=>`<span class="plate"><i>TR</i><b>${esc(p)}</b></span>`;
 const isOpen=j=>!j.paid&&j.payment!=='veresiye';
-
-/* Yapılan hizmetlerin yanında silme (çarpı) butonu eklendi */
 const itemsHTML = (j, isAdmin = false) => `<div class="items">${j.items.map((i, idx) => `
   <div>
     <span>${esc(i.name)}</span>
     <span style="display:flex; align-items:center; gap:8px;">
       <b>${TL(i.price)}</b>
-      ${isAdmin ? `<button class="btn red sm" onclick="removeItem('${j.id}', ${idx})" style="padding:2px 6px; font-size:0.7rem; border-radius:6px;" title="Bu hizmeti sil">✕</button>` : ''}
+      ${isAdmin ? `<button class="btn red sm" onclick="removeItem('${j.id}', ${idx})" style="padding:2px 6px; font-size:0.7rem; border-radius:6px;" title="Sil">✕</button>` : ''}
     </span>
   </div>`).join('')}</div>`;
 
@@ -250,10 +256,7 @@ async function setStatus(id,s){
   j.status=s; rJobs();
   await supa.from('jobs').update({status: s}).eq('id', id);
   if(s==='bitti') {
-    let paymentInfo = '';
-    if(S.settings.ibanNo) {
-      paymentInfo = `\n\nÖdeme Yöntemimiz:\n${S.settings.ibanNo} (${S.settings.ibanName})`;
-    }
+    let paymentInfo = S.settings.ibanNo ? `\n\nÖdeme Yöntemimiz:\n${S.settings.ibanNo} (${S.settings.ibanName})` : '';
     sendWA(j, 'Aracınız ('+j.plate+') bitmiştir, gelip teslim alabilirsiniz. '+S.settings.shop + paymentInfo);
   }
   toast(ST[s]);
@@ -285,16 +288,13 @@ async function credit(id){
 
 function remind(id){
   const j=S.jobs.find(x=>x.id===id);
-  let paymentInfo = '';
-  if(S.settings.ibanNo) {
-    paymentInfo = `\n\nÖdeme Yöntemimiz:\n${S.settings.ibanNo} (${S.settings.ibanName})`;
-  }
+  let paymentInfo = S.settings.ibanNo ? `\n\nÖdeme Yöntemimiz:\n${S.settings.ibanNo} (${S.settings.ibanName})` : '';
   sendWA(j,'Merhaba'+(j.name?' '+j.name:'')+', '+S.settings.shop+' için '+TL(total(j))+' tutarında ödemeniz bulunmaktadır. İyi günler dileriz.' + paymentInfo);
 }
 
 function rCredit(){
   const L=S.jobs.filter(j=>j.payment==='veresiye'&&!j.paid).sort((a,b)=>a.creditAt-b.creditAt);
-  $('#t-veresiye').innerHTML=`<div class="stats"><div class="stat"><b>${TL(L.reduce((a,j)=>a+total(j),0))}</b><span>Toplam veresiye alacak</span></div><div class="stat"><b>${L.length}</b><span>Açık kayıt</span></div></div>`+
+  $('#t-veresiye').innerHTML=`<div class="stats"><div class="stat amber"><b>${TL(L.reduce((a,j)=>a+total(j),0))}</b><span>Toplam veresiye alacak</span></div><div class="stat"><b>${L.length}</b><span>Açık kayıt</span></div></div>`+
   (L.length?L.map(j=>`<div class="card"><div class="top">${plateHTML(j.plate)}<div class="who"><b>${esc(j.name||'İsimsiz')}</b><small>${esc(j.phone)} · ${new Date(j.creditAt).toLocaleDateString('tr-TR')}</small></div><b class="amt">${TL(total(j))}</b></div>
     ${itemsHTML(j)}<div class="acts"><button class="btn" onclick="pay('${j.id}','v')">Ödeme alındı</button><button class="btn sec" onclick="remind('${j.id}')">WhatsApp'tan hatırlat</button></div></div>`).join(''):'<div class="card empty">Veresiye kayıt yok.</div>');
 }
@@ -306,12 +306,10 @@ async function addItem(id,sid){
   rJobs(); toast('Hizmet eklendi');
 }
 
-/* Yanlış eklenen hizmeti listeden silme fonksiyonu */
 async function removeItem(id, index){
   const j = S.jobs.find(x => x.id === id);
   if(!j || j.items.length <= 1) return toast('En az 1 hizmet kalmalıdır');
-  if(!confirm('Bu hizmeti iptal etmek/silmek istediğinize emin misiniz?')) return;
-  
+  if(!confirm('Bu hizmet silinsin mi?')) return;
   j.items.splice(index, 1);
   await supa.from('jobs').update({items: j.items}).eq('id', id);
   rJobs(); toast('Hizmet silindi');
@@ -326,11 +324,10 @@ async function delJob(id){
 }
 
 async function delJobCash(id){
-  if(confirm('Bu kazanç kaydını tamamen silmek istediğinize emin misiniz?')){
+  if(confirm('Bu kazanç kaydı silinsin mi?')){
     S.jobs = S.jobs.filter(x => x.id !== id);
     await supa.from('jobs').delete().eq('id', id);
-    rCash(); 
-    toast('Kazanç kaydı silindi');
+    rCash(); toast('Kayıt silindi');
   }
 }
 
@@ -390,8 +387,7 @@ function rSvc(){
     <div id="svcList">${S.services.map(s=>`<div class="svc" data-id="${s.id}">
       <input value="${esc(s.name)}" data-f="name"><input type="number" value="${s.price}" data-f="price" inputmode="numeric">
       <button class="btn red sm" data-del>Sil</button></div>`).join('')}</div>
-    <button class="btn sec" id="svcAdd">+ Yeni hizmet</button>
-    <p style="color:var(--mut);font-size:.85rem">Fiyat değişikliği sadece yeni kayıtları etkiler; mevcut araçların fiyatı değişmez.</p></div>`;
+    <button class="btn sec" id="svcAdd">+ Yeni hizmet</button></div>`;
   
   const L=$('#svcList');
   L.oninput = async e => {
@@ -435,7 +431,114 @@ function rCash(){
           <button class="btn red sm" onclick="delJobCash('${j.id}')" style="padding:5px 10px; font-size:0.75rem;">Sil</button>
         </span>
       </div>`).join('')}</div></div>`).join('')
-      :'<div class="card empty">Henüz tahsilat yok. Bitmiş araçta "Ücret alındı"ya basınca burada görünür.</div>'}`;
+      :'<div class="card empty">Henüz tahsilat yok.</div>'}`;
+}
+
+/* ============ GİDERLER ============ */
+function rExp(){
+  const totExp = S.expenses.reduce((a,e)=>a+Number(e.amount),0);
+  $('#t-gider').innerHTML = `<div class="card"><h2>Gider Ekle</h2>
+    <label>Tutar (TL)</label><input id="eAmt" type="number" placeholder="500" inputmode="numeric">
+    <label>Giderin Yeri / Açıklama</label><input id="eDesc" placeholder="Örn: Elektrik faturası, Su, Deterjan...">
+    <button class="btn full" id="eSave">Gideri Kaydet</button></div>
+    
+    <div class="stats"><div class="stat red-gr"><b>${TL(totExp)}</b><span>Toplam Giderler</span></div></div>
+    
+    <div class="card"><h2>Gider Geçmişi</h2>
+    ${S.expenses.length ? S.expenses.map(e=>`
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);">
+        <div>
+          <b style="color:var(--navy);">${esc(e.description)}</b>
+          <small style="display:block; color:var(--mut);">${new Date(e.expense_date).toLocaleDateString('tr-TR')}</small>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <b style="color:#b91c1c;">-${TL(e.amount)}</b>
+          <button class="btn red sm" onclick="delExp('${e.id}')" style="padding:4px 8px; font-size:0.75rem;">✕</button>
+        </div>
+      </div>`).join('') : '<div class="empty">Henüz kaydedilmiş gider yok.</div>'}</div>`;
+      
+  $('#eSave').onclick = async () => {
+    const amount = Number($('#eAmt').value);
+    const description = $('#eDesc').value.trim();
+    if(!amount || !description) return toast('Tutar ve açıklama giriniz');
+    
+    const { data: { user } } = await supa.auth.getUser();
+    const { data, error } = await supa.from('expenses').insert({
+      owner: user.id, amount, description
+    }).select().single();
+    
+    if(!error && data) {
+      S.expenses.unshift(data);
+      rExp(); toast('Gider kaydedildi');
+    } else {
+      toast('Kayıt başarısız');
+    }
+  };
+}
+
+async function delExp(id){
+  if(!confirm('Bu gider silinsin mi?')) return;
+  S.expenses = S.expenses.filter(x => x.id !== id);
+  await supa.from('expenses').delete().eq('id', id);
+  rExp(); toast('Gider silindi');
+}
+
+/* ============ KAR / ZARAR TABLOSU (AY AY) ============ */
+function rProfit(){
+  const paid = S.jobs.filter(j => j.paid);
+  const creditJobs = S.jobs.filter(j => j.payment === 'veresiye' && !j.paid);
+  const totalCredit = creditJobs.reduce((a,j)=>a+total(j),0);
+  
+  // Ay ay gruplama (YYYY-MM)
+  const months = {};
+  
+  paid.forEach(j => {
+    const d = new Date(j.paidAt);
+    const mKey = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    months[mKey] = months[mKey] || { income: 0, expense: 0, label: d.toLocaleDateString('tr-TR', {month:'long', year:'numeric'}) };
+    months[mKey].income += j.paidAmount;
+  });
+  
+  S.expenses.forEach(e => {
+    const d = new Date(e.expense_date);
+    const mKey = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    months[mKey] = months[mKey] || { income: 0, expense: 0, label: d.toLocaleDateString('tr-TR', {month:'long', year:'numeric'}) };
+    months[mKey].expense += Number(e.amount);
+  });
+  
+  const sortedMonths = Object.keys(months).sort().reverse();
+  
+  const totalIncAll = paid.reduce((a,j)=>a+j.paidAmount,0);
+  const totalExpAll = S.expenses.reduce((a,e)=>a+Number(e.amount),0);
+  const netProfitAll = totalIncAll - totalExpAll;
+  
+  $('#t-karzarar').innerHTML = `
+    <div class="stats">
+      <div class="stat green"><b>${TL(totalIncAll)}</b><span>Toplam Kazanç (Tahsil Edilen)</span></div>
+      <div class="stat red-gr"><b>${TL(totalExpAll)}</b><span>Toplam Giderler</span></div>
+      <div class="stat amber"><b>${TL(totalCredit)}</b><span>Toplam Veresiye (Hariç)</span></div>
+    </div>
+    
+    <div class="card" style="background:linear-gradient(135deg,#14284a,#1e40af); color:#fff; text-align:center; padding:20px;">
+      <span style="opacity:0.8; font-size:0.9rem;">GENEL NET KÂR</span>
+      <b style="font-size:2rem; display:block; margin-top:4px;">${TL(netProfitAll)}</b>
+    </div>
+    
+    <h2 style="margin-top:20px;">Ay Ay Kar / Zarar Dökümü</h2>
+    ${sortedMonths.length ? sortedMonths.map(k => {
+      const m = months[k];
+      const net = m.income - m.expense;
+      return `<div class="card">
+        <div class="top">
+          <h2>${m.label}</h2>
+          <b class="amt" style="color:${net >= 0 ? '#059669' : '#dc2626'}">Net: ${TL(net)}</b>
+        </div>
+        <div class="items" style="margin-top:10px;">
+          <div><span>Kazanç (Ciro):</span><b style="color:var(--navy);">${TL(m.income)}</b></div>
+          <div><span>Giderler:</span><b style="color:#dc2626;">-${TL(m.expense)}</b></div>
+        </div>
+      </div>`;
+    }).join('') : '<div class="card empty">Henüz finansal hareket yok.</div>'}`;
 }
 
 /* ============ AYARLAR ============ */
@@ -476,7 +579,7 @@ async function rCust(id){
   
   const { data: j, error } = await supa.rpc('get_job', { job_id: id });
   
-  if(error || !j){ c.innerHTML='<div class="card"><h2>Kayıt bulunamadı</h2><p>Link hatalı olabilir. Dükkanla iletişime geçin.</p></div>'; return; }
+  if(error || !j){ c.innerHTML='<div class="card"><h2>Kayıt bulunamadı</h2><p>Link hatalı olabilir.</p></div>'; return; }
   
   const ang={bekliyor:-60,yikaniyor:0,bitti:60}[j.status];
   const msg={bekliyor:'Aracınız sırada, yakında başlayacağız.',yikaniyor:'Aracınız şu an yıkanıyor.',bitti:'Aracınız hazır, gelip teslim alabilirsiniz.'}[j.status];
