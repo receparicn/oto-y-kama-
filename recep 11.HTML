@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oto Yıkama</title>
+<!-- Supabase kütüphanesi -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#e9eff7;--card:#fff;--ink:#16233a;--mut:#64748b;--line:#dbe3ee;--blue:#2563eb;--navy:#1e3a5f;--sky:#0ea5e9;--grey:#64748b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,sans-serif;line-height:1.45}
+header{color:#fff;padding:22px 20px 34px;background:radial-gradient(circle at 85% 20%,rgba(125,211,252,.35) 0 38px,transparent 40px),radial-gradient(circle at 92% 70%,rgba(255,255,255,.18) 0 18px,transparent 20px),radial-gradient(circle at 74% 85%,rgba(255,255,255,.12) 0 10px,transparent 12px),linear-gradient(135deg,#14284a,#2563eb)}
+header h1{margin:0;font-size:1.4rem;letter-spacing:.3px}header small{opacity:.75}
+nav{display:flex;gap:6px;padding:8px;margin:-20px 12px 0;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);border-radius:999px;box-shadow:0 6px 20px rgba(30,58,95,.15);position:sticky;top:8px;z-index:5;overflow-x:auto}
+nav button{border:0;background:none;padding:10px 16px;border-radius:999px;font:inherit;font-weight:600;color:var(--mut);cursor:pointer;white-space:nowrap}
+nav button.on{background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff}
+main{max-width:860px;margin:0 auto;padding:18px 14px 40px}
+.card{background:var(--card);border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(30,58,95,.08)}
+h2{margin:0 0 12px;font-size:1.05rem}
+label{display:block;font-size:.85rem;color:var(--mut);margin:10px 0 4px}
+input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;font:inherit;background:#f6f9fd}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:140px}
+.btn{border:0;border-radius:12px;padding:12px 16px;font:inherit;font-weight:700;cursor:pointer;background:var(--blue);color:#fff}
+.btn.sec{background:#e2e8f0;color:var(--ink)}.btn.red{background:#fee2e2;color:#b91c1c}.btn.vr{background:#334155}.btn.sm{padding:8px 12px;font-size:.85rem}
+.btn.full{width:100%;margin-top:14px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chip{border:1px solid var(--line);border-radius:14px;padding:10px 14px;cursor:pointer;background:#f6f9fd;user-select:none}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.plate{display:inline-flex;height:38px;border:2px solid #111;border-radius:7px;background:#fff;overflow:hidden;font-weight:800}
+.plate i{background:#1d4ed8;color:#fff;font-size:.6rem;font-style:normal;display:flex;align-items:flex-end;padding:0 6px 4px}
+.plate b{padding:0 12px;display:flex;align-items:center;font-size:1.1rem;letter-spacing:2px;color:#111}
+.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.sum div{background:var(--card);border-radius:16px;padding:12px;text-align:center;color:var(--mut);font-size:.82rem;box-shadow:0 4px 16px rgba(30,58,95,.06)}
+.sum b{display:block;font-size:1.6rem;color:var(--navy)}
+.job{border-top:5px solid var(--grey)}.job.yikaniyor{border-color:var(--sky)}.job.bitti{border-color:#1e40af}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.who{flex:1;min-width:110px;display:flex;flex-direction:column}.who small{color:var(--mut)}
+.amt{font-size:1.15rem;color:var(--navy)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:#e8eef6;border-radius:14px;padding:4px;margin:14px 0 10px}
+.seg button{border:0;background:none;padding:11px 4px;border-radius:11px;font:inherit;font-weight:700;color:var(--mut);cursor:pointer;transition:.2s}
+.seg .bekliyor.on{background:#64748b;color:#fff}.seg .yikaniyor.on{background:#0ea5e9;color:#fff}.seg .bitti.on{background:#1e40af;color:#fff}
+.items{margin:6px 0;font-size:.92rem;color:var(--mut)}
+.items div{display:flex;justify-content:space-between;padding:3px 0;align-items:center}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.acts .btn:not(.sm){flex:1;min-width:130px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:linear-gradient(135deg,#14284a,#2563eb);color:#fff;border-radius:18px;padding:16px;box-shadow:0 6px 18px rgba(37,99,235,.25)}
+.stat b{display:block;font-size:1.4rem}.stat span{color:#bfdbfe;font-size:.85rem}
+.svc{display:flex;gap:8px;align-items:center;margin-bottom:8px}.svc input:first-child{flex:2}.svc input{flex:1}
+.empty{color:var(--mut);text-align:center;padding:28px}
+.tot{display:flex;justify-content:space-between;border-top:1px solid var(--line);margin-top:8px;padding-top:10px;font-weight:700}
+.hide{display:none!important}
+#cust{max-width:460px;margin:0 auto;padding:16px}
+.hero{background:radial-gradient(circle at 90% 8%,rgba(125,211,252,.3) 0 34px,transparent 36px),linear-gradient(160deg,#14284a,#1d4ed8);color:#fff;border-radius:26px;padding:24px 20px 22px;text-align:center;margin-bottom:14px;box-shadow:0 10px 30px rgba(20,40,74,.3)}
+.hero .shop{opacity:.8;margin-bottom:12px}
+.gauge{width:100%;max-width:340px;margin:8px auto 0;display:block}
+.needle{transform-origin:150px 150px;transition:transform 1.1s cubic-bezier(.3,1.5,.5,1)}
+.state{font-size:1.7rem;font-weight:800}.hero p{margin:4px 0 0;opacity:.85}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16233a;color:#fff;padding:10px 18px;border-radius:999px;opacity:0;transition:.3s;pointer-events:none;z-index:9999}
+#toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.needle,.seg button{transition:none}}
+
+/* GİRİŞ EKRANI STİLLERİ */
+#loginScreen { position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); z-index:999; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:20px; }
+.login-card { background:var(--card); border-radius:20px; padding:30px 20px; width:100%; max-width:320px; text-align:center; box-shadow:0 10px 30px rgba(30,58,95,.15); }
+.pin-box { width:100%; font-size:2rem; letter-spacing:16px; text-align:center; font-weight:800; padding:15px; margin:20px 0; border-radius:12px; border:2px solid var(--line); background:#f6f9fd; color:var(--navy); }
+.pin-box:focus { outline:none; border-color:var(--blue); }
+</style>
+</head>
+<body>
+
+<!-- GİRİŞ EKRANI -->
+<div id="loginScreen" class="hide">
+  <div class="login-card">
+    <h2 style="margin-bottom: 5px;">Dükkan Paneli</h2>
+    <p style="color:var(--mut); font-size:0.85rem; margin-top:0;">Giriş için şifrenizi girin</p>
+    <input type="password" id="pinInput" class="pin-box" maxlength="4" placeholder="••••" inputmode="numeric">
+    <button class="btn full" id="pinBtn">Giriş Yap</button>
+    <p id="pinErr" class="hide" style="color:#b91c1c; font-size:0.85rem; margin-top:14px; font-weight:600;">Hatalı şifre veya bağlantı hatası!</p>
+  </div>
+</div>
+
+<!-- MÜŞTERİ DURUM EKRANI -->
+<div id="cust" class="hide"></div>
+
+<!-- DÜKKAN PANELİ -->
+<div id="admin" class="hide">
+<header><h1 id="shopTitle">Oto Yıkama</h1><small>Dükkan paneli</small></header>
+<nav id="nav">
+  <button data-t="araclar" class="on">Araçlar</button>
+  <button data-t="yeni">Yeni kayıt</button>
+  <button data-t="veresiye">Veresiye</button>
+  <button data-t="hizmet">Hizmetler</button>
+  <button data-t="kasa">Kazanç defteri</button>
+  <button data-t="ayar">Ayarlar</button>
+</nav>
+<main>
+  <section id="t-araclar"></section>
+  <section id="t-yeni" class="hide"></section>
+  <section id="t-veresiye" class="hide"></section>
+  <section id="t-hizmet" class="hide"></section>
+  <section id="t-kasa" class="hide"></section>
+  <section id="t-ayar" class="hide"></section>
+</main>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ============ SUPABASE BAĞLANTISI ============ */
+const SUPABASE_URL = 'https://dekgcnvnzzenmhxthtep.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRla2djbnZuenplbm1oeHRodGVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyNDEwMjAsImV4cCI6MjEwOTgxNzAyMH0.90YprWVOva676ODXbL9abTw_ZgANIWnrfbTx9mESGYw';
+const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let S = { settings:{shop:'Oto Yıkama',baseUrl:''}, services:[], jobs:[] };
+
+const $ = (s,e=document)=>e.querySelector(s);
+const TL = n=>Number(n||0).toLocaleString('tr-TR')+' ₺';
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ST = {bekliyor:'Beklemede',yikaniyor:'Yıkanıyor',bitti:'Bitti'};
+const total = j=>j.items.reduce((a,b)=>a+Number(b.price),0);
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200)}
+
+/* Veritabanından JS formatına dönüştürücüler */
+const mapJobFromDB = j => ({
+  id: j.id, plate: j.plate, name: j.customer_name, phone: j.phone,
+  status: j.status, items: j.items, payment: j.payment,
+  paid: j.payment === 'odendi', paidAmount: j.paid_amount,
+  paidAt: j.paid_at ? new Date(j.paid_at).getTime() : null,
+  creditAt: j.credit_at ? new Date(j.credit_at).getTime() : null,
+  created: new Date(j.created_at).getTime()
+});
+
+/* Supabase'den ilk verileri çekme */
+async function loadDB() {
+  const [resSet, resSvc, resJobs] = await Promise.all([
+    supa.from('settings').select('*').maybeSingle(),
+    supa.from('services').select('*').order('created_at'),
+    supa.from('jobs').select('*')
+  ]);
+  if(resSet.data) S.settings = {shop: resSet.data.shop, baseUrl: resSet.data.base_url};
+  if(resSvc.data) S.services = resSvc.data;
+  if(resJobs.data) S.jobs = resJobs.data.map(mapJobFromDB);
+}
+
+function trackLink(id){
+  const base = S.settings.baseUrl || location.href.split('#')[0];
+  return base + '#t=' + id;
+}
+function waNumber(p){
+  let d = String(p).replace(/\D/g,'');
+  if(d.startsWith('00')) d=d.slice(2);
+  if(d.startsWith('0')) d='90'+d.slice(1);
+  if(d.length===10) d='90'+d;
+  return d;
+}
+function sendWA(job, text){
+  window.open('https://wa.me/'+waNumber(job.phone)+'?text='+encodeURIComponent(text),'_blank');
+}
+
+/* ============ GİRİŞ EKRANI YÖNETİMİ ============ */
+$('#pinBtn').onclick = async () => {
+  const pin = $('#pinInput').value;
+  $('#pinErr').classList.add('hide');
+  
+  if(pin === '0710') {
+    pinBtn.textContent = "Giriş Yapılıyor...";
+    pinBtn.disabled = true;
+    
+    // RLS güvenliği için arka planda Supabase girişi yapıyoruz
+    const { data, error } = await supa.auth.signInWithPassword({
+      email: 'admin@otoyikama.com',
+      password: 'sifre0710'
+    });
+    
+    if(error) {
+      $('#pinErr').textContent = "Bağlantı hatası! Supabase'de kullanıcıyı oluşturdunuz mu?";
+      $('#pinErr').classList.remove('hide');
+      pinBtn.textContent = "Giriş Yap";
+      pinBtn.disabled = false;
+    } else {
+      await loadDB();
+      title();
+      $('#loginScreen').classList.add('hide');
+      $('#admin').classList.remove('hide');
+      showTab('araclar');
+    }
+  } else {
+    $('#pinErr').textContent = "Hatalı şifre!";
+    $('#pinErr').classList.remove('hide');
+  }
+};
+
+/* ============ SEKMELER ============ */
+$('#nav').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  showTab(b.dataset.t);
+});
+function showTab(t){
+  document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
+  document.querySelectorAll('main section').forEach(x=>x.classList.toggle('hide',x.id!=='t-'+t));
+  ({araclar:rJobs,yeni:rNew,veresiye:rCredit,hizmet:rSvc,kasa:rCash,ayar:rSet})[t]();
+}
+
+/* ============ ARAÇLAR ============ */
+const plateHTML=p=>`<span class="plate"><i>TR</i><b>${esc(p)}</b></span>`;
+const isOpen=j=>!j.paid&&j.payment!=='veresiye';
+const itemsHTML=j=>`<div class="items">${j.items.map(i=>`<div><span>${esc(i.name)}</span><span>${TL(i.price)}</span></div>`).join('')}</div>`;
+
+function rJobs(){
+  const act=S.jobs.filter(isOpen).sort((a,b)=>b.created-a.created);
+  const n=k=>act.filter(j=>j.status===k).length;
+  $('#t-araclar').innerHTML=`<div class="sum"><div><b>${n('bekliyor')}</b>Beklemede</div><div><b>${n('yikaniyor')}</b>Yıkanıyor</div><div><b>${n('bitti')}</b>Bitti</div></div>`+
+  (act.length?act.map(j=>`
+    <div class="card job ${j.status}">
+      <div class="top">${plateHTML(j.plate)}<div class="who"><b>${esc(j.name||'İsimsiz')}</b><small>${esc(j.phone)}</small></div><b class="amt">${TL(total(j))}</b></div>
+      <div class="seg" role="group" aria-label="Durum">${Object.keys(ST).map(k=>`<button class="${k} ${j.status===k?'on':''}" onclick="setStatus('${j.id}','${k}')">${ST[k]}</button>`).join('')}</div>
+      ${itemsHTML(j)}
+      <div class="acts">
+        <button class="btn" onclick="pay('${j.id}')">Ödeme alındı</button>
+        <button class="btn vr" onclick="credit('${j.id}')">Veresiye</button>
+      </div>
+      <div class="acts">
+        <select onchange="addItem('${j.id}',this.value);this.value=''" style="width:auto;flex:1"><option value="">+ Hizmet ekle</option>${S.services.map(s=>`<option value="${s.id}">${esc(s.name)} (${TL(s.price)})</option>`).join('')}</select>
+        <button class="btn sec sm" onclick="copyLink('${j.id}')">Takip linki</button>
+        <button class="btn red sm" onclick="delJob('${j.id}')">Sil</button>
+      </div></div>`).join(''):'<div class="card empty">Şu an içeride araç yok. "Yeni kayıt" ile araç ekleyin.</div>');
+}
+
+async function setStatus(id,s){
+  const j=S.jobs.find(x=>x.id===id); if(j.status===s) return;
+  j.status=s; rJobs(); // Ekranda anında günceller (Optimistic)
+  await supa.from('jobs').update({status: s}).eq('id', id);
+  if(s==='bitti') sendWA(j,'Aracınız ('+j.plate+') bitmiştir, gelip teslim alabilirsiniz. '+S.settings.shop);
+  toast(ST[s]);
+}
+
+async function pay(id,from){
+  const j=S.jobs.find(x=>x.id===id);
+  if(!confirm(j.plate+' için '+TL(total(j))+' ödeme alındı mı?')) return;
+  
+  j.paid=true; j.payment='odendi'; j.paidAt=Date.now(); j.paidAmount=total(j);
+  await supa.from('jobs').update({
+    payment: 'odendi', paid_amount: j.paidAmount, paid_at: new Date().toISOString()
+  }).eq('id', id);
+  
+  from==='v'?rCredit():rJobs(); toast('Kasaya işlendi');
+}
+
+async function credit(id){
+  const j=S.jobs.find(x=>x.id===id);
+  if(!confirm(j.plate+' veresiye yazılsın mı? ('+TL(total(j))+')')) return;
+  
+  j.payment='veresiye'; j.creditAt=Date.now();
+  await supa.from('jobs').update({
+    payment: 'veresiye', credit_at: new Date().toISOString()
+  }).eq('id', id);
+  
+  rJobs(); toast('Veresiye deftere yazıldı');
+}
+
+function remind(id){
+  const j=S.jobs.find(x=>x.id===id);
+  sendWA(j,'Merhaba'+(j.name?' '+j.name:'')+', '+S.settings.shop+' için '+TL(total(j))+' tutarında ödemeniz bulunmaktadır. İyi günler dileriz.');
+}
+
+function rCredit(){
+  const L=S.jobs.filter(j=>j.payment==='veresiye'&&!j.paid).sort((a,b)=>a.creditAt-b.creditAt);
+  $('#t-veresiye').innerHTML=`<div class="stats"><div class="stat"><b>${TL(L.reduce((a,j)=>a+total(j),0))}</b><span>Toplam veresiye alacak</span></div><div class="stat"><b>${L.length}</b><span>Açık kayıt</span></div></div>`+
+  (L.length?L.map(j=>`<div class="card"><div class="top">${plateHTML(j.plate)}<div class="who"><b>${esc(j.name||'İsimsiz')}</b><small>${esc(j.phone)} · ${new Date(j.creditAt).toLocaleDateString('tr-TR')}</small></div><b class="amt">${TL(total(j))}</b></div>
+    ${itemsHTML(j)}<div class="acts"><button class="btn" onclick="pay('${j.id}','v')">Ödeme alındı</button><button class="btn sec" onclick="remind('${j.id}')">WhatsApp'tan hatırlat</button></div></div>`).join(''):'<div class="card empty">Veresiye kayıt yok.</div>');
+}
+
+async function addItem(id,sid){
+  if(!sid) return; const s=S.services.find(x=>x.id===sid), j=S.jobs.find(x=>x.id===id);
+  j.items.push({name:s.name,price:s.price});
+  await supa.from('jobs').update({items: j.items}).eq('id', id);
+  rJobs();
+}
+
+async function delJob(id){ 
+  if(confirm('Bu kayıt silinsin mi?')){
+    S.jobs=S.jobs.filter(x=>x.id!==id); 
+    await supa.from('jobs').delete().eq('id', id);
+    rJobs();
+  } 
+}
+
+/* YENİ EKLENEN: KAZANÇ DEFTERİNDEN SİLME FONKSİYONU */
+async function delJobCash(id){
+  if(confirm('Bu kazanç kaydını tamamen silmek istediğinize emin misiniz?')){
+    S.jobs = S.jobs.filter(x => x.id !== id);
+    await supa.from('jobs').delete().eq('id', id);
+    rCash(); 
+    toast('Kazanç kaydı silindi');
+  }
+}
+
+function copyLink(id){
+  const l=trackLink(id);
+  (navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>toast('Link kopyalandı'),()=>prompt('Linki kopyalayın:',l));
+}
+
+/* ============ YENİ KAYIT ============ */
+let picked = new Set();
+function rNew(){
+  picked = new Set();
+  $('#t-yeni').innerHTML = `<div class="card"><h2>Araç kaydı</h2>
+    <label>Plaka</label><input id="nPlate" placeholder="07 ABC 123" autocapitalize="characters">
+    <label>Araç sahibi</label><input id="nName" placeholder="Ad Soyad">
+    <label>Telefon (WhatsApp)</label><input id="nPhone" type="tel" placeholder="05xx xxx xx xx">
+    <label>Yapılacak işlemler</label>
+    <div class="chips" id="nChips">${S.services.map(s=>`<span class="chip" data-id="${s.id}">${esc(s.name)} · ${TL(s.price)}</span>`).join('')}</div>
+    <div class="tot"><span>Toplam</span><span id="nTot">0 ₺</span></div>
+    <button class="btn full" id="nSave">Kaydet ve WhatsApp'tan bildir</button></div>`;
+  
+  $('#nChips').onclick=e=>{
+    const c=e.target.closest('.chip'); if(!c) return;
+    const id=c.dataset.id; picked.has(id)?picked.delete(id):picked.add(id);
+    c.classList.toggle('on');
+    $('#nTot').textContent=TL(S.services.filter(s=>picked.has(s.id)).reduce((a,s)=>a+Number(s.price),0));
+  };
+  
+  $('#nSave').onclick = async () => {
+    const plate=$('#nPlate').value.trim().toUpperCase(), phone=$('#nPhone').value.trim();
+    if(!plate||!phone) return toast('Plaka ve telefon gerekli');
+    if(!picked.size) return toast('En az bir işlem seçin');
+    
+    $('#nSave').disabled = true; $('#nSave').textContent = "Kaydediliyor...";
+    
+    const items = S.services.filter(s=>picked.has(s.id)).map(s=>({name:s.name,price:s.price}));
+    const insertData = { plate, customer_name: $('#nName').value.trim(), phone, status: 'bekliyor', items };
+    
+    // Supabase'e ekle ve oluşturulan ID'yi geri al
+    const { data: inserted, error } = await supa.from('jobs').insert(insertData).select().single();
+    
+    if(!error && inserted) {
+      const j = mapJobFromDB(inserted);
+      S.jobs.push(j);
+      sendWA(j,'Merhaba'+(j.name?' '+j.name:'')+', bizi tercih ettiğiniz için teşekkür ederiz. '+S.settings.shop+
+        '\nAracınızın ('+j.plate+') durumunu buradan takip edebilirsiniz:\n'+trackLink(j.id));
+      showTab('araclar'); toast('Araç kaydedildi');
+    } else {
+      toast('Kayıt başarısız oldu');
+      $('#nSave').disabled = false; $('#nSave').textContent = "Kaydet ve WhatsApp'tan bildir";
+    }
+  };
+}
+
+/* ============ HİZMETLER ============ */
+function rSvc(){
+  $('#t-hizmet').innerHTML = `<div class="card"><h2>Hizmetler ve fiyatlar</h2>
+    <div id="svcList">${S.services.map(s=>`<div class="svc" data-id="${s.id}">
+      <input value="${esc(s.name)}" data-f="name"><input type="number" value="${s.price}" data-f="price" inputmode="numeric">
+      <button class="btn red sm" data-del>Sil</button></div>`).join('')}</div>
+    <button class="btn sec" id="svcAdd">+ Yeni hizmet</button>
+    <p style="color:var(--mut);font-size:.85rem">Fiyat değişikliği sadece yeni kayıtları etkiler; mevcut araçların fiyatı değişmez.</p></div>`;
+  
+  const L=$('#svcList');
+  L.oninput = async e => {
+    const r=e.target.closest('.svc'); if(!r) return;
+    const s=S.services.find(x=>x.id===r.dataset.id);
+    s[e.target.dataset.f] = e.target.dataset.f==='price'?Number(e.target.value):e.target.value;
+    await supa.from('services').update({name: s.name, price: s.price}).eq('id', s.id);
+  };
+  
+  L.onclick = async e => {
+    if(e.target.dataset.del===undefined) return;
+    const r=e.target.closest('.svc');
+    S.services=S.services.filter(x=>x.id!==r.dataset.id);
+    await supa.from('services').delete().eq('id', r.dataset.id);
+    rSvc();
+  };
+  
+  $('#svcAdd').onclick = async () => {
+    const { data } = await supa.from('services').insert({name:'Yeni hizmet', price:0}).select().single();
+    if(data) { S.services.push(data); rSvc(); }
+  };
+}
+
+/* ============ KAZANÇ DEFTERİ ============ */
+function rCash(){
+  const paid=S.jobs.filter(j=>j.paid).sort((a,b)=>b.paidAt-a.paidAt);
+  const now=new Date(), d0=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  const sum=f=>paid.filter(j=>j.paidAt>=f).reduce((a,j)=>a+j.paidAmount,0);
+  const days={}; paid.forEach(j=>{const k=new Date(j.paidAt).toLocaleDateString('tr-TR');(days[k]=days[k]||[]).push(j)});
+  
+  $('#t-kasa').innerHTML = `<div class="stats">
+    <div class="stat"><b>${TL(sum(d0))}</b><span>Bugün</span></div>
+    <div class="stat"><b>${TL(sum(d0-6*864e5))}</b><span>Son 7 gün</span></div>
+    <div class="stat"><b>${TL(sum(new Date(now.getFullYear(),now.getMonth(),1).getTime()))}</b><span>Bu ay</span></div>
+    <div class="stat"><b>${TL(sum(0))}</b><span>Toplam</span></div></div>
+    ${paid.length?Object.entries(days).map(([k,a])=>`<div class="card"><div class="top"><h2>${k}</h2><b>${TL(a.reduce((x,j)=>x+j.paidAmount,0))}</b></div>
+      <div class="items">${a.map(j=>`<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--line);">
+        <span style="flex:1;">${esc(j.plate)} · ${j.items.map(i=>esc(i.name)).join(', ')}</span>
+        <span style="display:flex; gap:12px; align-items:center;">
+          <b style="color:var(--navy);">${TL(j.paidAmount)}</b>
+          <button class="btn red sm" onclick="delJobCash('${j.id}')" style="padding:5px 10px; font-size:0.75rem;">Sil</button>
+        </span>
+      </div>`).join('')}</div></div>`).join('')
+      :'<div class="card empty">Henüz tahsilat yok. Bitmiş araçta "Ücret alındı"ya basınca burada görünür.</div>'}`;
+}
+
+/* ============ AYARLAR ============ */
+function rSet(){
+  $('#t-ayar').innerHTML = `<div class="card"><h2>Ayarlar</h2>
+    <label>Dükkan adı</label><input id="aShop" value="${esc(S.settings.shop)}">
+    <label>Takip linki adresi (siteyi yayınlayınca buraya sitenin adresini yazın)</label>
+    <input id="aBase" value="${esc(S.settings.baseUrl)}" placeholder="https://siteadresim.com/">
+    <button class="btn full" id="aSave">Kaydet</button></div>`;
+    
+  $('#aSave').onclick = async () => {
+    S.settings.shop = $('#aShop').value.trim()||'Oto Yıkama';
+    S.settings.baseUrl = $('#aBase').value.trim();
+    
+    const { data: { user } } = await supa.auth.getUser();
+    await supa.from('settings').upsert({owner: user.id, shop: S.settings.shop, base_url: S.settings.baseUrl});
+    
+    title(); toast('Kaydedildi');
+  };
+}
+function title(){ $('#shopTitle').textContent=S.settings.shop; document.title=S.settings.shop }
+
+/* ============ MÜŞTERİ DURUM EKRANI (ŞİFRESİZ) ============ */
+async function rCust(id){
+  $('#admin').classList.add('hide'); const c=$('#cust'); c.classList.remove('hide');
+  
+  // get_job fonksiyonu SQL'de anonime açık olduğu için giriş yapmadan çalışır
+  const { data: j, error } = await supa.rpc('get_job', { job_id: id });
+  
+  if(error || !j){ c.innerHTML='<div class="card"><h2>Kayıt bulunamadı</h2><p>Link hatalı olabilir. Dükkanla iletişime geçin.</p></div>'; return; }
+  
+  const ang={bekliyor:-60,yikaniyor:0,bitti:60}[j.status];
+  const msg={bekliyor:'Aracınız sırada, yakında başlayacağız.',yikaniyor:'Aracınız şu an yıkanıyor.',bitti:'Aracınız hazır, gelip teslim alabilirsiniz.'}[j.status];
+  const o=k=>j.status===k?1:.3;
+  
+  c.innerHTML=`<div class="hero"><div class="shop">${esc(j.shop)}</div>${plateHTML(j.plate)}
+    <svg class="gauge" viewBox="0 0 300 180" role="img" aria-label="${ST[j.status]}">
+      <path d="M30 150 A120 120 0 0 1 90 46" fill="none" stroke="#94a3b8" stroke-width="22" opacity="${o('bekliyor')}"/>
+      <path d="M94 44 A120 120 0 0 1 206 44" fill="none" stroke="#38bdf8" stroke-width="22" opacity="${o('yikaniyor')}"/>
+      <path d="M210 46 A120 120 0 0 1 270 150" fill="none" stroke="#60a5fa" stroke-width="22" opacity="${o('bitti')}"/>
+      <text x="48" y="174" font-size="12" fill="#cbd5e1" text-anchor="middle">Beklemede</text>
+      <text x="150" y="30" font-size="12" fill="#cbd5e1" text-anchor="middle">Yıkanıyor</text>
+      <text x="252" y="174" font-size="12" fill="#cbd5e1" text-anchor="middle">Bitti</text>
+      <g class="needle" id="needle" style="transform:rotate(-60deg)"><path d="M150 150 L146 150 L150 62 L154 150Z" fill="#fff"/></g>
+      <circle cx="150" cy="150" r="9" fill="#fff"/></svg>
+    <div class="state">${ST[j.status]}</div><p>${msg}</p></div>
+    <div class="card"><h2>Yapılan işlemler</h2>${itemsHTML(j)}<div class="tot"><span>Toplam</span><span>${TL(total(j))}</span></div></div>`;
+    
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{const n=$('#needle');if(n)n.style.transform='rotate('+ang+'deg)'}));
+}
+
+/* ============ BAŞLAT ============ */
+(async function(){
+  // Linkte UUID formatında müşteri takip kodu var mı kontrol et
+  const m=location.hash.match(/t=([\w-]+)/); 
+  
+  if(m){ 
+    // Müşteri ekranıysa şifre sorma, direkt rpc fonksiyonuyla aracı göster
+    rCust(m[1]); 
+    setInterval(() => rCust(m[1]), 10000); 
+  } else {
+    // Admin paneline giriliyorsa, oturum var mı kontrol et
+    const { data } = await supa.auth.getSession();
+    
+    if(data.session) {
+      // Zaten Supabase oturumu açıksa şifre sorma, direkt yükle
+      await loadDB();
+      title();
+      $('#admin').classList.remove('hide');
+      showTab('araclar');
+    } else {
+      // Oturum yoksa PIN kalkanını göster
+      $('#loginScreen').classList.remove('hide');
+    }
+  }
+})();
+</script>
+</body>
+</html>
