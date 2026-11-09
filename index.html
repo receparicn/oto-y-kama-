@@ -58,6 +58,7 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outl
 .gauge{width:100%;max-width:340px;margin:8px auto 0;display:block}
 .needle{transform-origin:150px 150px;transition:transform 1.1s cubic-bezier(.3,1.5,.5,1)}
 .state{font-size:1.7rem;font-weight:800}.hero p{margin:4px 0 0;opacity:.85}
+.ig-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:700;margin-top:14px;width:100%;box-shadow:0 4px 12px rgba(220,39,67,.25)}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16233a;color:#fff;padding:10px 18px;border-radius:999px;opacity:0;transition:.3s;pointer-events:none;z-index:9999}
 #toast.on{opacity:1}
 @media (prefers-reduced-motion:reduce){.needle,.seg button{transition:none}}
@@ -113,7 +114,7 @@ const SUPABASE_URL = 'https://dekgcnvnzzenmhxthtep.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRla2djbnZuenplbm1oeHRodGVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyNDEwMjAsImV4cCI6MjEwOTgxNzAyMH0.90YprWVOva676ODXbL9abTw_ZgANIWnrfbTx9mESGYw';
 const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let S = { settings:{shop:'Oto Yıkama',baseUrl:''}, services:[], jobs:[] };
+let S = { settings:{shop:'Oto Yıkama',baseUrl:'', instagram:''}, services:[], jobs:[] };
 
 const $ = (s,e=document)=>e.querySelector(s);
 const TL = n=>Number(n||0).toLocaleString('tr-TR')+' ₺';
@@ -139,7 +140,7 @@ async function loadDB() {
     supa.from('services').select('*').order('created_at'),
     supa.from('jobs').select('*')
   ]);
-  if(resSet.data) S.settings = {shop: resSet.data.shop, baseUrl: resSet.data.base_url};
+  if(resSet.data) S.settings = {shop: resSet.data.shop, baseUrl: resSet.data.base_url, instagram: resSet.data.instagram || ''};
   if(resSvc.data) S.services = resSvc.data;
   if(resJobs.data) S.jobs = resJobs.data.map(mapJobFromDB);
 }
@@ -168,7 +169,6 @@ $('#pinBtn').onclick = async () => {
     pinBtn.textContent = "Giriş Yapılıyor...";
     pinBtn.disabled = true;
     
-    // RLS güvenliği için arka planda Supabase girişi yapıyoruz
     const { data, error } = await supa.auth.signInWithPassword({
       email: 'admin@otoyikama.com',
       password: 'sifre0710'
@@ -230,7 +230,7 @@ function rJobs(){
 
 async function setStatus(id,s){
   const j=S.jobs.find(x=>x.id===id); if(j.status===s) return;
-  j.status=s; rJobs(); // Ekranda anında günceller (Optimistic)
+  j.status=s; rJobs();
   await supa.from('jobs').update({status: s}).eq('id', id);
   if(s==='bitti') sendWA(j,'Aracınız ('+j.plate+') bitmiştir, gelip teslim alabilirsiniz. '+S.settings.shop);
   toast(ST[s]);
@@ -287,7 +287,6 @@ async function delJob(id){
   } 
 }
 
-/* YENİ EKLENEN: KAZANÇ DEFTERİNDEN SİLME FONKSİYONU */
 async function delJobCash(id){
   if(confirm('Bu kazanç kaydını tamamen silmek istediğinize emin misiniz?')){
     S.jobs = S.jobs.filter(x => x.id !== id);
@@ -332,7 +331,6 @@ function rNew(){
     const items = S.services.filter(s=>picked.has(s.id)).map(s=>({name:s.name,price:s.price}));
     const insertData = { plate, customer_name: $('#nName').value.trim(), phone, status: 'bekliyor', items };
     
-    // Supabase'e ekle ve oluşturulan ID'yi geri al
     const { data: inserted, error } = await supa.from('jobs').insert(insertData).select().single();
     
     if(!error && inserted) {
@@ -406,16 +404,19 @@ function rCash(){
 function rSet(){
   $('#t-ayar').innerHTML = `<div class="card"><h2>Ayarlar</h2>
     <label>Dükkan adı</label><input id="aShop" value="${esc(S.settings.shop)}">
-    <label>Takip linki adresi (siteyi yayınlayınca buraya sitenin adresini yazın)</label>
-    <input id="aBase" value="${esc(S.settings.baseUrl)}" placeholder="https://siteadresim.com/">
+    <label>Takip linki adresi (GitHub site adresiniz)</label>
+    <input id="aBase" value="${esc(S.settings.baseUrl)}" placeholder="https://kullaniciadin.github.io/otoyikama/">
+    <label>Instagram Profil Linki</label>
+    <input id="aIg" value="${esc(S.settings.instagram)}" placeholder="https://instagram.com/otoyikama">
     <button class="btn full" id="aSave">Kaydet</button></div>`;
     
   $('#aSave').onclick = async () => {
     S.settings.shop = $('#aShop').value.trim()||'Oto Yıkama';
     S.settings.baseUrl = $('#aBase').value.trim();
+    S.settings.instagram = $('#aIg').value.trim();
     
     const { data: { user } } = await supa.auth.getUser();
-    await supa.from('settings').upsert({owner: user.id, shop: S.settings.shop, base_url: S.settings.baseUrl});
+    await supa.from('settings').upsert({owner: user.id, shop: S.settings.shop, base_url: S.settings.baseUrl, instagram: S.settings.instagram});
     
     title(); toast('Kaydedildi');
   };
@@ -426,7 +427,6 @@ function title(){ $('#shopTitle').textContent=S.settings.shop; document.title=S.
 async function rCust(id){
   $('#admin').classList.add('hide'); const c=$('#cust'); c.classList.remove('hide');
   
-  // get_job fonksiyonu SQL'de anonime açık olduğu için giriş yapmadan çalışır
   const { data: j, error } = await supa.rpc('get_job', { job_id: id });
   
   if(error || !j){ c.innerHTML='<div class="card"><h2>Kayıt bulunamadı</h2><p>Link hatalı olabilir. Dükkanla iletişime geçin.</p></div>'; return; }
@@ -435,6 +435,10 @@ async function rCust(id){
   const msg={bekliyor:'Aracınız sırada, yakında başlayacağız.',yikaniyor:'Aracınız şu an yıkanıyor.',bitti:'Aracınız hazır, gelip teslim alabilirsiniz.'}[j.status];
   const o=k=>j.status===k?1:.3;
   
+  // Settings'ten instagram linkini de çekebilmek için ek sorgu
+  const { data: setData } = await supa.from('settings').select('instagram').maybeSingle();
+  const igLink = setData?.instagram || '';
+
   c.innerHTML=`<div class="hero"><div class="shop">${esc(j.shop)}</div>${plateHTML(j.plate)}
     <svg class="gauge" viewBox="0 0 300 180" role="img" aria-label="${ST[j.status]}">
       <path d="M30 150 A120 120 0 0 1 90 46" fill="none" stroke="#94a3b8" stroke-width="22" opacity="${o('bekliyor')}"/>
@@ -445,7 +449,9 @@ async function rCust(id){
       <text x="252" y="174" font-size="12" fill="#cbd5e1" text-anchor="middle">Bitti</text>
       <g class="needle" id="needle" style="transform:rotate(-60deg)"><path d="M150 150 L146 150 L150 62 L154 150Z" fill="#fff"/></g>
       <circle cx="150" cy="150" r="9" fill="#fff"/></svg>
-    <div class="state">${ST[j.status]}</div><p>${msg}</p></div>
+    <div class="state">${ST[j.status]}</div><p>${msg}</p>
+    ${igLink ? `<a href="${esc(igLink)}" target="_blank" class="ig-btn">📷 Instagram'da Bizi Takip Edin</a>` : ''}
+    </div>
     <div class="card"><h2>Yapılan işlemler</h2>${itemsHTML(j)}<div class="tot"><span>Toplam</span><span>${TL(total(j))}</span></div></div>`;
     
   requestAnimationFrame(()=>requestAnimationFrame(()=>{const n=$('#needle');if(n)n.style.transform='rotate('+ang+'deg)'}));
@@ -453,25 +459,20 @@ async function rCust(id){
 
 /* ============ BAŞLAT ============ */
 (async function(){
-  // Linkte UUID formatında müşteri takip kodu var mı kontrol et
   const m=location.hash.match(/t=([\w-]+)/); 
   
   if(m){ 
-    // Müşteri ekranıysa şifre sorma, direkt rpc fonksiyonuyla aracı göster
     rCust(m[1]); 
     setInterval(() => rCust(m[1]), 10000); 
   } else {
-    // Admin paneline giriliyorsa, oturum var mı kontrol et
     const { data } = await supa.auth.getSession();
     
     if(data.session) {
-      // Zaten Supabase oturumu açıksa şifre sorma, direkt yükle
       await loadDB();
       title();
       $('#admin').classList.remove('hide');
       showTab('araclar');
     } else {
-      // Oturum yoksa PIN kalkanını göster
       $('#loginScreen').classList.remove('hide');
     }
   }
