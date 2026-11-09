@@ -42,7 +42,7 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outl
 .seg button{border:0;background:none;padding:11px 4px;border-radius:11px;font:inherit;font-weight:700;color:var(--mut);cursor:pointer;transition:.2s}
 .seg .bekliyor.on{background:#64748b;color:#fff}.seg .yikaniyor.on{background:#0ea5e9;color:#fff}.seg .bitti.on{background:#1e40af;color:#fff}
 .items{margin:6px 0;font-size:.92rem;color:var(--mut)}
-.items div{display:flex;justify-content:space-between;padding:3px 0;align-items:center}
+.items div{display:flex;justify-content:space-between;padding:4px 0;align-items:center}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
 .acts .btn:not(.sm){flex:1;min-width:130px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
@@ -214,7 +214,16 @@ function showTab(t){
 /* ============ ARAÇLAR ============ */
 const plateHTML=p=>`<span class="plate"><i>TR</i><b>${esc(p)}</b></span>`;
 const isOpen=j=>!j.paid&&j.payment!=='veresiye';
-const itemsHTML=j=>`<div class="items">${j.items.map(i=>`<div><span>${esc(i.name)}</span><span>${TL(i.price)}</span></div>`).join('')}</div>`;
+
+/* Yapılan hizmetlerin yanında silme (çarpı) butonu eklendi */
+const itemsHTML = (j, isAdmin = false) => `<div class="items">${j.items.map((i, idx) => `
+  <div>
+    <span>${esc(i.name)}</span>
+    <span style="display:flex; align-items:center; gap:8px;">
+      <b>${TL(i.price)}</b>
+      ${isAdmin ? `<button class="btn red sm" onclick="removeItem('${j.id}', ${idx})" style="padding:2px 6px; font-size:0.7rem; border-radius:6px;" title="Bu hizmeti sil">✕</button>` : ''}
+    </span>
+  </div>`).join('')}</div>`;
 
 function rJobs(){
   const act=S.jobs.filter(isOpen).sort((a,b)=>b.created-a.created);
@@ -224,7 +233,7 @@ function rJobs(){
     <div class="card job ${j.status}">
       <div class="top">${plateHTML(j.plate)}<div class="who"><b>${esc(j.name||'İsimsiz')}</b><small>${esc(j.phone)}</small></div><b class="amt">${TL(total(j))}</b></div>
       <div class="seg" role="group" aria-label="Durum">${Object.keys(ST).map(k=>`<button class="${k} ${j.status===k?'on':''}" onclick="setStatus('${j.id}','${k}')">${ST[k]}</button>`).join('')}</div>
-      ${itemsHTML(j)}
+      ${itemsHTML(j, true)}
       <div class="acts">
         <button class="btn" onclick="pay('${j.id}')">Ödeme alındı</button>
         <button class="btn vr" onclick="credit('${j.id}')">Veresiye</button>
@@ -294,7 +303,18 @@ async function addItem(id,sid){
   if(!sid) return; const s=S.services.find(x=>x.id===sid), j=S.jobs.find(x=>x.id===id);
   j.items.push({name:s.name,price:s.price});
   await supa.from('jobs').update({items: j.items}).eq('id', id);
-  rJobs();
+  rJobs(); toast('Hizmet eklendi');
+}
+
+/* Yanlış eklenen hizmeti listeden silme fonksiyonu */
+async function removeItem(id, index){
+  const j = S.jobs.find(x => x.id === id);
+  if(!j || j.items.length <= 1) return toast('En az 1 hizmet kalmalıdır');
+  if(!confirm('Bu hizmeti iptal etmek/silmek istediğinize emin misiniz?')) return;
+  
+  j.items.splice(index, 1);
+  await supa.from('jobs').update({items: j.items}).eq('id', id);
+  rJobs(); toast('Hizmet silindi');
 }
 
 async function delJob(id){ 
@@ -478,7 +498,7 @@ async function rCust(id){
     <div class="state">${ST[j.status]}</div><p>${msg}</p>
     ${igLink ? `<a href="${esc(igLink)}" target="_blank" class="ig-btn">📷 Instagram'da Bizi Takip Edin</a>` : ''}
     </div>
-    <div class="card"><h2>Yapılan işlemler</h2>${itemsHTML(j)}<div class="tot"><span>Toplam</span><span>${TL(total(j))}</span></div></div>`;
+    <div class="card"><h2>Yapılan işlemler</h2>${itemsHTML(j, false)}<div class="tot"><span>Toplam</span><span>${TL(total(j))}</span></div></div>`;
     
   requestAnimationFrame(()=>requestAnimationFrame(()=>{const n=$('#needle');if(n)n.style.transform='rotate('+ang+'deg)'}));
 }
