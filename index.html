@@ -244,9 +244,11 @@ async function setStatus(id, s) {
   j.status = s;
   rJobs();
   await supa.from('jobs').update({status: s}).eq('id', id);
+  
   if(s === 'bitti') {
     let paymentInfo = S.settings.ibanNo ? `\n\nÖdeme Yöntemimiz:\n${S.settings.ibanNo} (${S.settings.ibanName})` : '';
-    sendWA(j, 'Aracınız ('+j.plate+') bitmiştir, gelip teslim alabilirsiniz. '+S.settings.shop + paymentInfo);
+    let msg = 'Merhaba ' + (j.name ? j.name.toUpperCase() + ', ' : '') + j.plate + ' plakalı aracınız bitmiştir, gelip teslim alabilirsiniz. Bizi tercih ettiğiniz için teşekkürler. ' + S.settings.shop + paymentInfo;
+    sendWA(j, msg);
   }
   toast(ST[s]);
 }
@@ -349,7 +351,11 @@ function rNew(){
     
     if(!error && inserted) {
       const j = mapJobFromDB(inserted); S.jobs.push(j);
-      sendWA(j,'Merhaba'+(j.name?' '+j.name:'')+', '+S.settings.shop+' terciginiz için teşekkürler. Takip linki:\n'+trackLink(j.id));
+      
+      // YENİ WHATSAPP ŞABLONU (ÖNCE PLAKA)
+      let msg = 'Merhaba ' + (j.name ? j.name.toUpperCase() + ', ' : '') + 'bizi tercih ettiğiniz için teşekkür ederiz. ' + S.settings.shop + '\n\n' + j.plate + ' plakalı aracınızın durumunu buradan takip edebilirsiniz:\n' + trackLink(j.id);
+      sendWA(j, msg);
+      
       showTab('araclar'); toast('Araç kaydedildi');
     } else {
       toast('Kayıt başarısız'); $('#nSave').disabled = false; $('#nSave').textContent = "Kaydet";
@@ -533,7 +539,7 @@ async function rCust(id){
 
   const o=k=>j.status===k?1:.3;
   
-  // Instagram ve IBAN bilgileri güvenle çekiliyor
+  // Instagram ve IBAN bilgileri çekiliyor
   const { data: setData } = await supa.from('settings').select('*').maybeSingle();
   const igLink = setData?.instagram || '';
   const ibanName = setData?.iban_name || '';
