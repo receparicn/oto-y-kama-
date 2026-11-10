@@ -176,7 +176,6 @@ function sendWA(job, text){
 $('#pinBtn').onclick = async () => {
   const pin = $('#pinInput').value;
   $('#pinErr').classList.add('hide');
-  
   if(pin === '0710') {
     pinBtn.textContent = "Giriş Yapılıyor...";
     pinBtn.disabled = true;
@@ -222,7 +221,11 @@ function rJobs(){
   (act.length?act.map(j=>`
     <div class="card job ${j.status}">
       <div class="top">${plateHTML(j.plate)}<div class="who"><b>${esc(j.name||'İsimsiz')}</b><small>${esc(j.phone)}</small></div><b class="amt">${TL(total(j))}</b></div>
-      <div class="seg" role="group">${Object.keys(ST).map(k=>`<button class="${k} ${j.status===k?'on':''}" onclick="setStatus('${j.id}','${k}')">${ST[k]}</button>`).join('')}</div>
+      
+      <div class="seg" role="group">
+        ${Object.keys(ST).map(k=>`<button class="${k} ${j.status===k?'on':''}" onclick="setStatus('${j.id}','${k}')">${ST[k]}</button>`).join('')}
+      </div>
+
       ${itemsHTML(j, true)}
       <div class="acts">
         <button class="btn" onclick="pay('${j.id}')">Ödeme alındı</button>
@@ -235,11 +238,13 @@ function rJobs(){
       </div></div>`).join(''):'<div class="card empty">Şu an içeride araç yok.</div>');
 }
 
-async function setStatus(id,s){
-  const j=S.jobs.find(x=>x.id===id); if(j.status===s) return;
-  j.status=s; rJobs();
+async function setStatus(id, s) {
+  const j = S.jobs.find(x => x.id === id);
+  if(j.status === s) return;
+  j.status = s;
+  rJobs();
   await supa.from('jobs').update({status: s}).eq('id', id);
-  if(s==='bitti') {
+  if(s === 'bitti') {
     let paymentInfo = S.settings.ibanNo ? `\n\nÖdeme Yöntemimiz:\n${S.settings.ibanNo} (${S.settings.ibanName})` : '';
     sendWA(j, 'Aracınız ('+j.plate+') bitmiştir, gelip teslim alabilirsiniz. '+S.settings.shop + paymentInfo);
   }
@@ -302,7 +307,7 @@ function copyLink(id){
   (navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>toast('Link kopyalandı'),()=>prompt('Linki kopyalayın:',l));
 }
 
-/* ============ YENİ KAYIT & HIZLI PLAKA HAFIZASI ============ */
+/* ============ YENİ KAYIT ============ */
 let picked = new Set();
 function rNew(){
   picked = new Set();
@@ -315,11 +320,9 @@ function rNew(){
     <div class="tot"><span>Toplam</span><span id="nTot">0 ₺</span></div>
     <button class="btn full" id="nSave">Kaydet ve WhatsApp'tan Bildir</button></div>`;
   
-  // Hızlı Plaka Hafızası: Plaka yazılıp çıkıldığında (blur) geçmiş müşteriyi arar
   $('#nPlate').onblur = function(){
     const val = this.value.trim().toUpperCase();
     if(val.length < 4) return;
-    // Geçmiş işlerden aynı plakalı en sonuncuyu bul
     const found = S.jobs.find(j => j.plate.replace(/\s+/g,'') === val.replace(/\s+/g,'') && j.name);
     if(found){
       if(!$('#nName').value) $('#nName').value = found.name;
@@ -427,13 +430,12 @@ async function delExp(id){
   await supa.from('expenses').delete().eq('id', id); rExp(); toast('Silindi');
 }
 
-/* ============ KAR / ZARAR & EN ÇOK SATAN HİZMETLER ============ */
+/* ============ KAR / ZARAR ============ */
 function rProfit(){
   const paid = S.jobs.filter(j => j.paid);
   const creditJobs = S.jobs.filter(j => j.payment === 'veresiye' && !j.paid);
   const totalCredit = creditJobs.reduce((a,j)=>a+total(j),0);
   
-  // En çok satan hizmetler istatistiği hesaplama
   const serviceStats = {};
   paid.forEach(j => {
     j.items.forEach(i => {
@@ -444,7 +446,6 @@ function rProfit(){
   });
   const sortedServices = Object.entries(serviceStats).sort((a,b)=>b[1].count - a[1].count);
 
-  // Ay ay gruplama
   const months = {};
   paid.forEach(j => {
     const d = new Date(j.paidAt);
@@ -475,14 +476,13 @@ function rProfit(){
       <b style="font-size:2rem; display:block; margin-top:4px;">${TL(netProfitAll)}</b>
     </div>
 
-    <!-- En Çok Satan Hizmetler Analizi -->
     <div class="card">
-      <h2>🏆 En Çok Satan Hizmetler (Popülerlik)</h2>
+      <h2>🏆 En Çok Satan Hizmetler</h2>
       ${sortedServices.length ? sortedServices.map(([name, dat]) => `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--line);">
           <span><b>${esc(name)}</b></span>
-          <span style="color:var(--mut); font-size:0.9rem;">${dat.count} kez satıldı · <b style="color:var(--navy);">${TL(dat.totalRev)}</b></span>
-        </div>`).join('') : '<div class="empty">Henüz satış verisi yok.</div>'}
+          <span style="color:var(--mut); font-size:0.9rem;">${dat.count} kez · <b style="color:var(--navy);">${TL(dat.totalRev)}</b></span>
+        </div>`).join('') : '<div class="empty">Satış verisi yok.</div>'}
     </div>
     
     <h2 style="margin-top:20px;">Ay Ay Kar / Zarar</h2>
@@ -521,11 +521,23 @@ async function rCust(id){
   $('#admin').classList.add('hide'); const c=$('#cust'); c.classList.remove('hide');
   const { data: j, error } = await supa.rpc('get_job', { job_id: id });
   if(error || !j){ c.innerHTML='<div class="card"><h2>Kayıt bulunamadı</h2></div>'; return; }
+  
   const ang={bekliyor:-60,yikaniyor:0,bitti:60}[j.status];
-  const msg={bekliyor:'Aracınız sırada.',yikaniyor:'Aracınız yıkanıyor.',bitti:'Aracınız hazır, teslim alabilirsiniz.'}[j.status];
+  
+  const msgs = {
+    bekliyor: 'Aracınız sırada, yakında başlayacağız.',
+    yikaniyor: 'Aracınız şu an yıkanıyor.',
+    bitti: 'Aracınız hazır, gelip teslim alabilirsiniz.'
+  };
+  const msg = msgs[j.status] || 'Aracınızın durumu güncelleniyor.';
+
   const o=k=>j.status===k?1:.3;
-  const { data: setData } = await supa.from('settings').select('instagram').maybeSingle();
+  
+  // Instagram ve IBAN bilgileri güvenle çekiliyor
+  const { data: setData } = await supa.from('settings').select('*').maybeSingle();
   const igLink = setData?.instagram || '';
+  const ibanName = setData?.iban_name || '';
+  const ibanNo = setData?.iban_no || '';
 
   c.innerHTML=`<div class="hero"><div class="shop">${esc(j.shop)}</div>${plateHTML(j.plate)}
     <svg class="gauge" viewBox="0 0 300 180" role="img">
@@ -534,9 +546,21 @@ async function rCust(id){
       <path d="M210 46 A120 120 0 0 1 270 150" fill="none" stroke="#60a5fa" stroke-width="22" opacity="${o('bitti')}"/>
       <g class="needle" id="needle" style="transform:rotate(-60deg)"><path d="M150 150 L146 150 L150 62 L154 150Z" fill="#fff"/></g>
       <circle cx="150" cy="150" r="9" fill="#fff"/></svg>
-    <div class="state">${ST[j.status]}</div><p>${msg}</p>
-    ${igLink ? `<a href="${esc(igLink)}" target="_blank" class="ig-btn">📷 Instagram'da Bizi Takip Edin</a>` : ''}</div>
+    <div class="state">${ST[j.status]}</div>
+    <p style="margin-top:8px; font-weight:600;">${msg}</p>
+    ${igLink ? `<a href="${esc(igLink)}" target="_blank" class="ig-btn">📷 Instagram'da Bizi Takip Edin</a>` : ''}
+    </div>
+
+    ${j.status === 'bitti' && ibanNo ? `
+      <div class="card" style="background:#f0fdf4; border:1px solid #bbf7d0; text-align:center;">
+        <h2 style="color:#166534; margin-bottom:6px;">💳 Ödeme Yöntemi (IBAN)</h2>
+        <p style="margin:2px 0; font-weight:700; color:#14532d; font-size:1.1rem; letter-spacing:1px;">${esc(ibanNo)}</p>
+        <small style="color:#15803d;">Hesap Sahibi: <b>${esc(ibanName)}</b></small>
+      </div>
+    ` : ''}
+
     <div class="card"><h2>Yapılan İşlemler</h2>${itemsHTML(j, false)}<div class="tot"><span>Toplam</span><span>${TL(total(j))}</span></div></div>`;
+    
   requestAnimationFrame(()=>requestAnimationFrame(()=>{const n=$('#needle');if(n)n.style.transform='rotate('+ang+'deg)'}));
 }
 
